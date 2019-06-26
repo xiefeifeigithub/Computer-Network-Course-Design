@@ -20,7 +20,7 @@ nsent = 0;
 struct timeval tval_start;
 const char *usage = 
   "usage: ping [-v] [-h] [-b] [-t ttl] [-q] [-c number] [-r number] [-i times] [-n seq_num] <hostname>\n"
-  "\t-h\t显示帮助信息"            //  ./ping_2 -h 
+  "\t-h\t显示帮助信息\n"            //  ./ping_2 -h 
   "\t-v\tNormal mode\n"           //  ./ping_2 -v www.baidu.com
   "\t-b\tBroadcast\n"             //  ./ping_2 -b <你所在局域网的广播地址> 
   "\t-t ttl\tSet TTL(0-255)\n"    //  ./ping_2 -t 10 www.baidu.com
@@ -50,9 +50,11 @@ int main(int argc, char **argv)
 		  return 0;
 		case 'b':
 		  broadcast_flag = 1;
+		  verbose++; 
 		  break;
 		case 't':
 		  ttl_flag = sscanf(optarg, "%d", &ttl) && ttl >= 0 && ttl < 256;
+		  verbose++; 
 		  break;
 		case 'q':
 		  verbose--;
@@ -338,7 +340,7 @@ void sig_alrm(int signo)
 {
         (*pr->fsend)();
         send_count++;
-        if( (interrupt_flag==1 && send_count == set_send_count) || (interrupt_flag==1 && recv_count == set_recv_count))
+        if( (interrupt_flag==1 && send_count == set_send_count) || (interrupt_flag==1 && recv_count == set_recv_count))  //如果已发送的包的个数==设定发送或接收数据包的个数、结束程序 
         interrupt();
         else
         alarm(send_time_interval);  //每隔1秒触发一次send函数 
