@@ -4,28 +4,36 @@ struct proto	proto_v4 = { proc_v4, send_v4, NULL, NULL, 0, IPPROTO_ICMP };
 #ifdef	IPV6
 struct proto	proto_v6 = { proc_v6, send_v6, NULL, NULL, 0, IPPROTO_ICMPV6 };
 #endif
-int	datalen = 56;		/* data that goes with ICMP echo request */  /*icmpåŒ…çš„è½½è·å­—èŠ‚æ•°*/
+int	datalen = 56;		/* data that goes with ICMP echo request */  /*icmp°üµÄÔØºÉ×Ö½ÚÊı*/
 double rtt_min = INFINITY, rtt_max = -INFINITY, rtt_total = 0, rtt_sqr_total = 0;
 long long send_count = 0, recv_count = 0;
+int set_send_count = -1;  //·¢ËÍÖ¸¶¨¸öÊıµÄÊı¾İ°ü
+int set_recv_count = -1;  //½ÓÊÕÖ¸¶¨¸öÊıµÄÊı¾İ°ü
 int ttl_flag = 0, broadcast_flag = 0;
+//interrupt_flag
+int interrupt_flag = 0;
 int ttl = 0;
 struct timeval tval_start;
 const char *usage = 
-  "usage: ping [-v] [-h] [-b] [-t ttl] [-q] <hostname>\n"
+  "usage: ping [-v] [-h] [-b] [-t ttl] [-q] [-c number] [-r number] <hostname>\n"
   "\t-v\tNormal mode\n"
   "\t-b\tBroadcast\n"
   "\t-t ttl\tSet TTL(0-255)\n"
-  "\t-q\tQuiet mode";
+  "\t-q\tQuiet mode"
+  "\t-s datalen"
+  "\t-c number"
+  "\t-r number";
 
 int main(int argc, char **argv)
 {
 	int				c;
-	struct addrinfo	*ai;   // ç›®æ ‡ä¸»æœºä¿¡æ¯
+	struct addrinfo	*ai;   // Ä¿±êÖ÷»úĞÅÏ¢
 	opterr = 0;		/* don't want getopt() writing to stderr */
 	
-	//å¤„ç†å‘½ä»¤è¡Œå‚æ•°
-    //ä¾‹å¦‚ï¼š./ping 127.0.0.1
-	while ( (c = getopt(argc, argv, "vhbt:q")) != -1) {
+	//´¦ÀíÃüÁîĞĞ²ÎÊı
+    //ÀıÈç£º./ping 127.0.0.1
+        char *seg1,*seg2,*seg3;
+	while ( (c = getopt(argc, argv, "vhbt:qs:c:r:")) != -1) {
 		switch (c) {
 		case 'v':
 			verbose++;
@@ -42,6 +50,23 @@ int main(int argc, char **argv)
 		case 'q':
 		  verbose--;
 		  break;
+		//·¢ËÍÖ¸¶¨´óĞ¡µÄÊı¾İ°ü ./ping_2 -s 60 www.baidu.com
+		case 's':
+		  sscanf(optarg, "%d", &datalen);
+		  verbose++;
+		  break;
+		//·¢ËÍÖ¸¶¨¸öÊıµÄÊı¾İ°ü
+		case 'c':
+		  sscanf(optarg, "%d", &set_send_count);
+		  verbose++;
+		  interrupt_flag = 1;
+		  break;
+		//½ÓÊÕÖ¸¶¨¸öÊıµÄÊı¾İ°ü
+		 case 'r':
+		  sscanf(optarg, "%d", &set_recv_count);
+		  verbose++;
+		  interrupt_flag = 1;
+		  break;
 		case '?':
 			err_quit("unrecognized option: %c", c, usage);}
 
@@ -49,25 +74,26 @@ int main(int argc, char **argv)
 if (optind != argc-1)
 		err_quit(usage);
 	
-	//hostä¿å­˜ipåœ°å€
+	//host±£´æipµØÖ·
 	host = argv[optind];
 
-    //è·å–å½“å‰çš„è¿›ç¨‹å·
+
+    //»ñÈ¡µ±Ç°µÄ½ø³ÌºÅ
 	pid = getpid();  /* ICMP ID field is 16 bits */
-	//å‘é€ä¿¡å·å‡½æ•°
+	//·¢ËÍĞÅºÅº¯Êı
 	signal(SIGALRM, sig_alrm);
 	signal(SIGINT, sig_int);
   
-    //åœ¨å‘½ä»¤è¡Œå‚æ•°ä¸­å¿…é¡»æœ‰ä¸€ä¸ªä¸»æœºåæˆ–ipåœ°å€ï¼Œè°ƒç”¨Host_servå‡½æ•°è¿›è¡Œå¤„ç†
-    //è¿”å›addrinfoç»“æ„
-	ai = host_serv(host, NULL, 0, 0);  //è·å–ç›®æ ‡ä¸»æœºä¿¡æ¯
+    //ÔÚÃüÁîĞĞ²ÎÊıÖĞ±ØĞëÓĞÒ»¸öÖ÷»úÃû»òipµØÖ·£¬µ÷ÓÃHost_servº¯Êı½øĞĞ´¦Àí
+    //·µ»Øaddrinfo½á¹¹
+	ai = host_serv(host, NULL, 0, 0);  //»ñÈ¡Ä¿±êÖ÷»úĞÅÏ¢
 
 	printf("ping %s (%s): %d data bytes\n", ai->ai_canonname,
 		   Sock_ntop_host(ai->ai_addr, ai->ai_addrlen), datalen);
 
 		/* 4initialize according to protocol */
-	//åˆå§‹åŒ–åè®®ç»“æ„ä½“pr
-    // IPv4 å’Œ IPv6 å¤„ç†éœ€è¦åŒºåˆ«å¼€, prä¿å­˜äº†åŒ…æ‹¬å¤„ç†æ–¹æ³•, æ¥æ”¶å’Œå‘é€åœ°å€ç­‰ç›¸å…³ä¿¡æ¯
+	//³õÊ¼»¯Ğ­Òé½á¹¹Ìåpr
+    // IPv4 ºÍ IPv6 ´¦ÀíĞèÒªÇø±ğ¿ª, pr±£´æÁË°üÀ¨´¦Àí·½·¨, ½ÓÊÕºÍ·¢ËÍµØÖ·µÈÏà¹ØĞÅÏ¢
 	if (ai->ai_family == AF_INET) {
 		pr = &proto_v4;
 #ifdef	IPV6
@@ -82,10 +108,10 @@ if (optind != argc-1)
 
 	pr->sasend = ai->ai_addr;
 	pr->sarecv = calloc(1, ai->ai_addrlen);
-	pr->salen = ai->ai_addrlen;  //åœ°å€ç»“æ„å­—èŠ‚æ•°
+	pr->salen = ai->ai_addrlen;  //µØÖ·½á¹¹×Ö½ÚÊı
 	
     gettimeofday(&tval_start, NULL);
-	readloop();  //å¤„ç†å¾ªç¯
+	readloop();  //´¦ÀíÑ­»·
 
 	exit(0);
 }
@@ -100,7 +126,7 @@ if (optind != argc-1)
 
 
 
-//IPv4ç±»å‹çš„åŸå§‹å¥—æ¥å­—, æˆ‘ä»¬å¾—åˆ°çš„æ•°æ®åŒ…æ˜¯åŒ…å«IPå¤´çš„, ICMPåŒ…ç´§è·Ÿåœ¨IPå¤´ä¹‹å
+//IPv4ÀàĞÍµÄÔ­Ê¼Ì×½Ó×Ö, ÎÒÃÇµÃµ½µÄÊı¾İ°üÊÇ°üº¬IPÍ·µÄ, ICMP°ü½ô¸úÔÚIPÍ·Ö®ºó
 void proc_v4(char *ptr, ssize_t len, struct timeval *tvrecv)
 {
 	int				hlen1, icmplen;
@@ -110,19 +136,19 @@ void proc_v4(char *ptr, ssize_t len, struct timeval *tvrecv)
 	struct timeval	*tvsend;
 
 	ip = (struct ip *) ptr;		/* start of IP header */
-	hlen1 = ip->ip_hl << 2;		/* length of IP header */  /*ipå¤´é•¿åº¦*/  //icmpæŠ¥æ–‡é•¿åº¦ä¸º16bits 
+	hlen1 = ip->ip_hl << 2;		/* length of IP header */  /*ipÍ·³¤¶È*/  //icmp±¨ÎÄ³¤¶ÈÎª16bits 
 
-	icmp = (struct icmp *) (ptr + hlen1);	/* start of ICMP header */  /*icmpæ•°æ®æŠ¥*/
-	if ( (icmplen = len - hlen1) < 8)  //éªŒè¯ICMPåŒ…çš„æœ‰æ•ˆæ€§, å› ä¸ºä¸€ä¸ªæ­£å¸¸çš„ICMPåŒ…è‡³å°‘æœ‰åŒ…å¤´çš„8å­—èŠ‚
+	icmp = (struct icmp *) (ptr + hlen1);	/* start of ICMP header */  /*icmpÊı¾İ±¨*/
+	if ( (icmplen = len - hlen1) < 8)  //ÑéÖ¤ICMP°üµÄÓĞĞ§ĞÔ, ÒòÎªÒ»¸öÕı³£µÄICMP°üÖÁÉÙÓĞ°üÍ·µÄ8×Ö½Ú
 		err_quit("icmplen (%d) < 8", icmplen);
 
 	if (icmp->icmp_type == ICMP_ECHOREPLY) {
-		if (icmp->icmp_id != pid)  //è¿‡æ»¤æ”¶åˆ°çš„æ•°æ®åŒ…, è®©ç¨‹åºåªå¤„ç†æœ¬è¿›ç¨‹å‘å‡ºçš„åŒ…çš„å“åº”
+		if (icmp->icmp_id != pid)  //¹ıÂËÊÕµ½µÄÊı¾İ°ü, ÈÃ³ÌĞòÖ»´¦Àí±¾½ø³Ì·¢³öµÄ°üµÄÏìÓ¦
 			return;			/* not a response to our ECHO_REQUEST */
 		if (icmplen < 16)
 			err_quit("icmplen (%d) < 16", icmplen);
 
-        //è®¡ç®—å¾€è¿”æ—¶é—´
+        //¼ÆËãÍù·µÊ±¼ä
 		tvsend = (struct timeval *) icmp->icmp_data;
 		tv_sub(tvrecv, tvsend);
 		rtt = tvrecv->tv_sec * 1000.0 + tvrecv->tv_usec / 1000.0;
@@ -145,7 +171,7 @@ void proc_v4(char *ptr, ssize_t len, struct timeval *tvrecv)
 }
 
 
-//Pv6åŸå§‹å¥—æ¥å­—æ‹¿åˆ°çš„æ•°æ®åŒ…æ˜¯ä¸åŒ…å«IPé¦–éƒ¨çš„, å½“æˆ‘ä»¬çš„åº”ç”¨æ‹¿åˆ°æ•°æ®æ—¶, å†…æ ¸å·²ç»å°†é¦–éƒ¨å¤„ç†äº†, æ‰€ä»¥å°±ä¸ç”¨åƒIPv4ç‰ˆæœ¬ä¸­é‚£æ ·ç§»åŠ¨æŒ‡é’ˆäº†
+//Pv6Ô­Ê¼Ì×½Ó×ÖÄÃµ½µÄÊı¾İ°üÊÇ²»°üº¬IPÊ×²¿µÄ, µ±ÎÒÃÇµÄÓ¦ÓÃÄÃµ½Êı¾İÊ±, ÄÚºËÒÑ¾­½«Ê×²¿´¦ÀíÁË, ËùÒÔ¾Í²»ÓÃÏñIPv4°æ±¾ÖĞÄÇÑùÒÆ¶¯Ö¸ÕëÁË
 void proc_v6(char *ptr, ssize_t len, struct timeval* tvrecv)
 {
 #ifdef	IPV6
@@ -192,7 +218,7 @@ void proc_v6(char *ptr, ssize_t len, struct timeval* tvrecv)
 #endif	/* IPV6 */
 }
 
-//create checksum è®¡ç®—æ ¡éªŒå’Œ 
+//create checksum ¼ÆËãĞ£ÑéºÍ 
 unsigned short in_cksum(unsigned short *addr, int len)
 {
         int                             nleft = len;
@@ -221,11 +247,11 @@ void send_v4(void)
 	int			len;
 	struct icmp	*icmp;
 
-    //init icmp datagram åˆå§‹åŒ–icmpæ•°æ®æŠ¥æ–‡ 
+    //init icmp datagram ³õÊ¼»¯icmpÊı¾İ±¨ÎÄ 
 	icmp = (struct icmp *) sendbuf;
 	icmp->icmp_type = ICMP_ECHO;  //type
 	icmp->icmp_code = 0;         //code 
-	icmp->icmp_id = pid;   //è¿™é‡Œæˆ‘ä»¬ç”¨çš„è¯·æ±‚æŠ¥æ–‡çš„ç¬¬5~6å­—èŠ‚æ˜¯è¿›ç¨‹id, ç”¨äºåœ¨å¾—åˆ°å“åº”ä»¥åç¡®å®šäº¤ç»™å“ªä¸ªè¿›ç¨‹å¤„ç†,
+	icmp->icmp_id = pid;   //ÕâÀïÎÒÃÇÓÃµÄÇëÇó±¨ÎÄµÄµÚ5~6×Ö½ÚÊÇ½ø³Ìid, ÓÃÓÚÔÚµÃµ½ÏìÓ¦ÒÔºóÈ·¶¨½»¸øÄÄ¸ö½ø³Ì´¦Àí,
 	icmp->icmp_seq = nsent++;
 	gettimeofday((struct timeval *) icmp->icmp_data, NULL);   //get send time
 
@@ -256,7 +282,7 @@ void send_v6()
 #endif	/* IPV6 */
 }
 
-//ç”¨äºå‘é€å’Œå¤„ç†æ¥æ”¶åˆ°çš„ICMPæ•°æ®åŒ…
+//ÓÃÓÚ·¢ËÍºÍ´¦Àí½ÓÊÕµ½µÄICMPÊı¾İ°ü
 void readloop(void)
 {	int				size;
 	char			recvbuf[BUFSIZE];
@@ -265,7 +291,7 @@ void readloop(void)
 	struct timeval	tval;
 	sockfd = socket(pr->sasend->sa_family, SOCK_RAW, pr->icmpproto);
 	setuid(getuid());		/* don't need special permissions any more */
-	size = 60 * 1024;		/*å°†å¥—æ¥å­—æ¥æ”¶ç¼“å†²åŒºå¤§å°è®¾ç½®å¤§ç‚¹, é˜²æ­¢å¯¹IPv4å¹¿æ’­åœ°å€æˆ–è€…å¤šæ’­åœ°å€ping*/
+	size = 60 * 1024;		/*½«Ì×½Ó×Ö½ÓÊÕ»º³åÇø´óĞ¡ÉèÖÃ´óµã, ·ÀÖ¹¶ÔIPv4¹ã²¥µØÖ·»òÕß¶à²¥µØÖ·ping*/
 	setsockopt(sockfd, SOL_SOCKET, SO_RCVBUF, &size, sizeof(size));	
 	if (ttl_flag)
        setsockopt(sockfd, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl)) ;
@@ -283,7 +309,7 @@ void readloop(void)
 			else
 				err_sys("recvfrom error");
 		}
-		gettimeofday(&tval, NULL);  //receive time  // å°†å½“å‰æ—¶é—´æˆ³å­˜å‚¨åœ¨tvalä¸­
+		gettimeofday(&tval, NULL);  //receive time  // ½«µ±Ç°Ê±¼ä´Á´æ´¢ÔÚtvalÖĞ
 		(*pr->fproc)(recvbuf, n, &tval);  //handle receive data
 	}
 }
@@ -295,11 +321,33 @@ void sig_alrm(int signo)
 {
         (*pr->fsend)();
         send_count++;
-        alarm(1);  //æ¯éš”1ç§’è§¦å‘ä¸€æ¬¡sendå‡½æ•° 
+        if( (interrupt_flag==1 && send_count == set_send_count) || (interrupt_flag==1 && recv_count == set_recv_count))
+        interrupt();
+        else
+        alarm(1);  //Ã¿¸ô1Ãë´¥·¢Ò»´Îsendº¯Êı 
         return;         /* probably interrupts recvfrom() */
 }
 
-//ä¸­æ–­å¤„ç† 
+//·¢ËÍ »òÕß ½ÓÊÕ echo request Êı¾İ°üµÄ×ÜÁ¿
+void interrupt()
+{
+  struct timeval tval_end;
+  double tval_total;
+  gettimeofday(&tval_end, NULL);
+  tv_sub(&tval_end, &tval_start);
+  tval_total = tval_end.tv_sec * 1000.0 + tval_end.tv_usec / 1000.0;
+
+  puts("---  ping  statistics ---");
+  printf("%lld packets transmitted, %lld received, %.0lf%% packet loss, time %.2lfms\n",
+    send_count, recv_count, (send_count - recv_count) * 100.0 / send_count, tval_total);
+  double rtt_avg = rtt_total / recv_count;
+  printf("rtt min/avg/max/mdev = %.3lf/%.3lf/%.3lf/%.3lf ms\n", rtt_min, 
+    rtt_avg, rtt_max, rtt_sqr_total / recv_count - rtt_avg * rtt_avg);
+  close(sockfd);
+  exit(0);
+}
+
+//ÖĞ¶Ï´¦Àí 
 void sig_int(int signo)
 {
   struct timeval tval_end;
@@ -318,7 +366,7 @@ void sig_int(int signo)
   exit(0);
 }
 
-//get rtt å¾—åˆ°å¾€è¿”æ—¶å»¶RTT(Round-Trip Time) 
+//get rtt µÃµ½Íù·µÊ±ÑÓRTT(Round-Trip Time) 
 void tv_sub(struct timeval *out, struct timeval *in)  //time,tv_sev is microseconds
 {
 	if ( (out->tv_usec -= in->tv_usec) < 0) {	/* out -= in */
@@ -394,17 +442,17 @@ char * Sock_ntop_host(const struct sockaddr *sa, socklen_t salen)
 struct addrinfo *host_serv(const char *host, const char *serv, int family, int socktype)
 {        int   n;
         struct addrinfo hints, *res;
-        //æ¸…é›¶
+        //ÇåÁã
         bzero(&hints, sizeof(struct addrinfo));
-        //ç”¨äºè¿”å›ä¸»æœºçš„è§„èŒƒåç§°
+        //ÓÃÓÚ·µ»ØÖ÷»úµÄ¹æ·¶Ãû³Æ
         hints.ai_flags = AI_CANONNAME;  /* always return canonical name */
-        //å…¶å€¼ä¸º0ä»£è¡¨ï¼šåè®®æ— å…³
+        //ÆäÖµÎª0´ú±í£ºĞ­ÒéÎŞ¹Ø
         hints.ai_family = family;               /* AF_UNSPEC, AF_INET, AF_INET6, etc. */
         hints.ai_socktype = socktype;   /* 0, SOCK_STREAM, SOCK_DGRAM, etc. */
         if ( (n = getaddrinfo(host, serv, &hints, &res)) != 0)
                 return(NULL);
 
-        return(res);    /* return pointer to first on linked list */  //è¿”å›é“¾æ¥åˆ—è¡¨ä¸Šçš„ç¬¬ä¸€ä¸ªæŒ‡é’ˆ
+        return(res);    /* return pointer to first on linked list */  //·µ»ØÁ´½ÓÁĞ±íÉÏµÄµÚÒ»¸öÖ¸Õë
 }
 /* end host_serv */
 

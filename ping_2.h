@@ -59,6 +59,7 @@ void	 send_v4(void);
 void	 send_v6(void);
 void	 readloop(void);
 void	 sig_alrm(int);
+void     interrupt();  //ÖĞ¶Ï 
 void     sig_int(int signo);
 void	 tv_sub(struct timeval *, struct timeval *);
 
@@ -69,12 +70,12 @@ void err_sys(const char *fmt,...);
 static void err_doit(int errnoflag, int level, const char *fmt, va_list ap);
 
 struct proto {
-  void	 (*fproc)(char *, ssize_t, struct timeval *);  //fproc æ˜¯æŒ‡å‘ç”¨äºå¤„ç†æ¥æ”¶åˆ°ICMPåŒ…çš„å‡½æ•°çš„æŒ‡é’ˆ,
-  void	 (*fsend)(void);  //fsend æ˜¯æŒ‡å‘ç”¨äºå‘é€ICMPæ•°æ®åŒ…çš„å‡½æ•°çš„æŒ‡é’ˆ
-  struct sockaddr  *sasend;	/* sockaddr{} for send, from getaddrinfo */  //sasend æ˜¯æŒ‡å‘ç›®æ ‡ä¸»æœºçš„åœ°å€ä¿¡æ¯çš„æŒ‡é’ˆ
-  struct sockaddr  *sarecv;	/* sockaddr{} for receiving */   //sarecv æŒ‡ç¤ºä»å“ªæ¥æ”¶ICMPæ•°æ®åŒ…
-  socklen_t	    salen;		/* length of sockaddr{}s */  //salen ä»¥ä¸Šä¸¤ä¸ªåœ°å€ç»“æ„çš„å¤§å°
-  int	   	    icmpproto;	/* IPPROTO_xxx value for ICMP */  //icmpproto æŒ‡ç¤ºä½¿ç”¨çš„ICMPåè®®å€¼, IPPROTO_ICMP æˆ– IPPROTO_ICMPV6
+  void	 (*fproc)(char *, ssize_t, struct timeval *);  //fproc ÊÇÖ¸ÏòÓÃÓÚ´¦Àí½ÓÊÕµ½ICMP°üµÄº¯ÊıµÄÖ¸Õë,
+  void	 (*fsend)(void);  //fsend ÊÇÖ¸ÏòÓÃÓÚ·¢ËÍICMPÊı¾İ°üµÄº¯ÊıµÄÖ¸Õë
+  struct sockaddr  *sasend;	/* sockaddr{} for send, from getaddrinfo */  //sasend ÊÇÖ¸ÏòÄ¿±êÖ÷»úµÄµØÖ·ĞÅÏ¢µÄÖ¸Õë
+  struct sockaddr  *sarecv;	/* sockaddr{} for receiving */   //sarecv Ö¸Ê¾´ÓÄÄ½ÓÊÕICMPÊı¾İ°ü
+  socklen_t	    salen;		/* length of sockaddr{}s */  //salen ÒÔÉÏÁ½¸öµØÖ·½á¹¹µÄ´óĞ¡
+  int	   	    icmpproto;	/* IPPROTO_xxx value for ICMP */  //icmpproto Ö¸Ê¾Ê¹ÓÃµÄICMPĞ­ÒéÖµ, IPPROTO_ICMP »ò IPPROTO_ICMPV6
 } *pr;
 
 
