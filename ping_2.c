@@ -19,10 +19,10 @@ const char *usage =
   "\t-v\tNormal mode\n"
   "\t-b\tBroadcast\n"
   "\t-t ttl\tSet TTL(0-255)\n"
-  "\t-q\tQuiet mode"
-  "\t-s datalen"
-  "\t-c number"
-  "\t-r number";
+  "\t-q\tQuiet mode\n"
+  "\t-s datalen\n"
+  "\t-c number\n"
+  "\t-r number\n";
 
 int main(int argc, char **argv)
 {
