@@ -13,16 +13,23 @@ int ttl_flag = 0, broadcast_flag = 0;
 //interrupt_flag
 int interrupt_flag = 0;
 int ttl = 0;
+//设置发送时间间隔
+int send_time_interval = 1; 
+//设置开始序列号
+nsent = 0; 
 struct timeval tval_start;
 const char *usage = 
-  "usage: ping [-v] [-h] [-b] [-t ttl] [-q] [-c number] [-r number] <hostname>\n"
-  "\t-v\tNormal mode\n"
-  "\t-b\tBroadcast\n"
-  "\t-t ttl\tSet TTL(0-255)\n"
-  "\t-q\tQuiet mode\n"
-  "\t-s datalen\n"
-  "\t-c number\n"
-  "\t-r number\n";
+  "usage: ping [-v] [-h] [-b] [-t ttl] [-q] [-c number] [-r number] [-i times] [-n seq_num] <hostname>\n"
+  "\t-h\t显示帮助信息"            //  ./ping_2 -h 
+  "\t-v\tNormal mode\n"           //  ./ping_2 -v www.baidu.com
+  "\t-b\tBroadcast\n"             //  ./ping_2 -b <你所在局域网的广播地址> 
+  "\t-t ttl\tSet TTL(0-255)\n"    //  ./ping_2 -t 10 www.baidu.com
+  "\t-q\t安静模式\n"              //  ./ping_2 -q www.baidu.com
+  "\t-s\t设置icmp包的荷载字节数\n"//  ./ping_2 -s 60 www.baidu.com
+  "\t-c\t设置发送包的个数\n"      //  ./ping_2 -c 5 www.baidu.com
+  "\t-r\t设置收到包的个数\n"      //  ./ping_2 -r 5 www.baidu.com
+  "\t-i\t设置发送包的时间间隔\n"  // ./ping_2 -i 5 www.baidu.com
+  "\t-n\t设置包的初始序列号\n";   //./ping_2 -n 1 www.baidu.com
 
 int main(int argc, char **argv)
 {
@@ -33,7 +40,7 @@ int main(int argc, char **argv)
 	//处理命令行参数
     //例如：./ping 127.0.0.1
         char *seg1,*seg2,*seg3;
-	while ( (c = getopt(argc, argv, "vhbt:qs:c:r:")) != -1) {
+	while ( (c = getopt(argc, argv, "vhbt:qs:c:r:i:n:")) != -1) {
 		switch (c) {
 		case 'v':
 			verbose++;
@@ -66,6 +73,16 @@ int main(int argc, char **argv)
 		  sscanf(optarg, "%d", &set_recv_count);
 		  verbose++;
 		  interrupt_flag = 1;
+		  break;
+		//设置发送包的时间间隔
+		case 'i':
+		  sscanf(optarg, "%d", &send_time_interval);
+		  verbose++;
+		  break;
+		//设置初始序列号
+		case 'n':
+		  sscanf(optarg, "%d", &nsent);
+		  verbose++;
 		  break;
 		case '?':
 			err_quit("unrecognized option: %c", c, usage);}
@@ -324,7 +341,7 @@ void sig_alrm(int signo)
         if( (interrupt_flag==1 && send_count == set_send_count) || (interrupt_flag==1 && recv_count == set_recv_count))
         interrupt();
         else
-        alarm(1);  //每隔1秒触发一次send函数 
+        alarm(send_time_interval);  //每隔1秒触发一次send函数 
         return;         /* probably interrupts recvfrom() */
 }
 
