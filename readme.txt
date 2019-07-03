@@ -20,3 +20,4 @@
 3. 执行可执行文件  ./ping_2  [-v] [-h] [-b] [-t ttl] [-q] [-c number] [-r number] [-i times] [-n seq_num] <hostname>\n"
 4. 查看和配置网络设备：windows中ipconfig、ubuntu中ifconfig。
 5. 广播域计算过程：ip&mask=网络地址，~mask|网络地址 = 广播地址
+6. ping_2.c/h：对ping程序的扩展、ping.c：采用多线程实现发包和解包。
